@@ -468,7 +468,7 @@ def fetch_schedule_data():
         "accept-encoding": "gzip, deflate, br, zstd",
         "accept-language": "de-DE,de;q=0.9",
         "priority": "u=1, i",
-        "referer": "https://daddylive.dad/",
+        "referer": "https://inattv1308.xyz/",
         "sec-ch-ua": '"Brave";v="137", "Chromium";v="137", "Not/A)Brand";v="24"',
         "sec-ch-ua-mobile": "?0",
         "sec-ch-ua-platform": '"Windows"',
