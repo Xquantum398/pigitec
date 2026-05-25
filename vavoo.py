@@ -3,9 +3,9 @@ import json
 import re
 import os
 
-USREPG = "https://github.com/pierluigibartoli"
+USREPG = "https://github.com/Xquantum398"
 BRANCHEPG = "ddmfp"
-MFPLINK = "https://pigi87-um191025.hf.space"     # non mettere lo / finale al link
+MFPLINK = "https://toritos-denim05.hf.space"     # non mettere lo / finale al link
 MFPPSW = "13021987"
 
 PROXY = f"{MFPLINK}/proxy/hls/manifest.m3u8?api_password={MFPPSW}&d="
