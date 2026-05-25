@@ -463,12 +463,12 @@ def fetch_schedule_data():
     """Holt die aktuellen Sendeplandaten von der Website"""
     url = "https://daddylive.dad/schedule/schedule-generated.php"
     headers = {
-        "authority": "daddylive.dad",
+        "authority": "https://inattv1308.xyz",
         "accept": "*/*",
         "accept-encoding": "gzip, deflate, br, zstd",
         "accept-language": "de-DE,de;q=0.9",
         "priority": "u=1, i",
-        "referer": "https://inattv1308.xyz/",
+        "referer": "https://inattv1308.xyz",
         "sec-ch-ua": '"Brave";v="137", "Chromium";v="137", "Not/A)Brand";v="24"',
         "sec-ch-ua-mobile": "?0",
         "sec-ch-ua-platform": '"Windows"',
@@ -533,11 +533,11 @@ def json_to_m3u(data, host_url):
                 try:
                     channel_id_int = int(channel_id)
                     if channel_id_int > 999:
-                        stream_url = f"https://daddylive.dad/stream/bet.php?id=bet{channel_id}"
+                        stream_url = f"https://inattv1308.xyz/stream/bet.php?id=bet{channel_id}"
                     else:
-                        stream_url = f"https://daddylive.dad/stream/stream-{channel_id}.php"
+                        stream_url = f"https://inattv1308.xyz/stream/stream-{channel_id}.php"
                 except (ValueError, TypeError):
-                    stream_url = f"https://daddylive.dad/stream/stream-{channel_id}.php"
+                    stream_url = f"https://inattv1308.xyz/stream/stream-{channel_id}.php"
 
                 proxy_url = f"{host_url}/proxy/m3u?url={quote(stream_url)}"
 
