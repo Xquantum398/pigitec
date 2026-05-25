@@ -1,12 +1,18 @@
+from fastapi import FastAPI
+from mediaflow_proxy.main import app as mediaflow_app  # Import mediaflow app
 import httpx
-from mediaflow_proxy.main import app as mediaflow_app
+import re
+import string
 
-# Mediaflow'un kullandığı varsayılan client'ı özelleştirilmiş bir client ile değiştir
-# (mediaflow'un iç yapısına göre bu değişebilir)
-CUSTOM_HEADERS = {"Referer": "https://inattv1308.xyz/"}
+# Initialize the main FastAPI application
+main_app = FastAPI()
 
-# httpx client'ı oluştur
-client = httpx.AsyncClient(headers=CUSTOM_HEADERS)
+# Manually add only non-static routes from mediaflow_app
+for route in mediaflow_app.routes:
+    if route.path != "/":  # Exclude the static file path
+        main_app.router.routes.append(route)
 
-# mediaflow_app.state'a atayabilirsiniz, ya da mediaflow'un bağımlılıklarını monkeypatch yapabilirsiniz
-mediaflow_app.state.http_client = client
+# Run the main app
+if __name__ == "__main__":
+    import uvicorn
+    uvicorn.run(main_app, host="0.0.0.0", port=8080)
