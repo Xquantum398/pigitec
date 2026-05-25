@@ -461,14 +461,14 @@ def playlist_events():
 
 def fetch_schedule_data():
     """Holt die aktuellen Sendeplandaten von der Website"""
-    url = "https://daddylive.dad/schedule/schedule-generated.php"
+    url = "https://inattv1308.xyz/schedule/schedule-generated.php"
     headers = {
-        "authority": "https://inattv1308.xyz",
+        "authority": "inattv1308.xyz",
         "accept": "*/*",
         "accept-encoding": "gzip, deflate, br, zstd",
         "accept-language": "de-DE,de;q=0.9",
         "priority": "u=1, i",
-        "referer": "https://inattv1308.xyz",
+        "referer": "https://inattv1308.xyz/",
         "sec-ch-ua": '"Brave";v="137", "Chromium";v="137", "Not/A)Brand";v="24"',
         "sec-ch-ua-mobile": "?0",
         "sec-ch-ua-platform": '"Windows"',
