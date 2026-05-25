@@ -1,0 +1,21 @@
+# Main MFP Configuration
+MFP="https://nellan-anton232.hf.space"
+PSW="Marco123"
+
+# Secondary MFP
+MFP2="https://nellan-anton232.hf.space"
+PSW2="Marco123"
+
+# Pigzilla
+RBT_GIT_HTML_BASE_URL="https://github.com/Xquantum398/quatro/tree/main/download/"
+
+HEADER="&h_user-agent=VAVOO/2.6&h_referer=https://vavoo.to/"
+
+NOMEGITHUB="marcomarotta"
+NOMEREPO="dda"
+
+SPZO="yoga"
+GUARCAL="team"
+DADDY="dad"
+SKYSTR="yoga"
+
