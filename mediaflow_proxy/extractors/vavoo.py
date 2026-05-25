@@ -247,10 +247,10 @@ def proxy_m3u():
     if '/stream/stream-' in m3u_url and 'daddylive.dad' in m3u_url:
         processed_url = m3u_url.replace('/stream/stream-', '/embed/stream-')
         print(f"URL {m3u_url} trasformato da /stream/ a /embed/: {processed_url}")
-    match_premium_m3u8 = re.search(r'/b2/mono\.m3u8$', m3u_url)
+    match_premium_m3u8 = re.search(r'/zirve/mono\.m3u8$', m3u_url)
 
   if match_premium_m3u8:
-    transformed_url = "https://2i4.d72577a9dd0ec71.cfd/b2/mono.m3u8"
+    transformed_url = "https://2i4.d72577a9dd0ec71.cfd/zirve/mono.m3u8"
     print(f"URL {m3u_url} trasformato in: {transformed_url}")
     processed_url = transformed_url
     else:
