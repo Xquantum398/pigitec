@@ -408,13 +408,13 @@ async def proxy_key(url: str = None, request_obj: Request = None):
         raise HTTPException(status_code=500, detail=f"Errore durante il download della chiave AES-128: {str(e)}")
 
 
-@app.get('/playlist/channels.m3u8')
-async def playlist_channels(request_obj: Request = None):
+@app.route('/playlist/channels.m3u8')
+def playlist_channels():
     """Gibt eine modifizierte Playlist mit Proxy-Links zurück"""
     playlist_url = "https://raw.githubusercontent.com/mehmetey03/METV/refs/heads/main/karsilasmalar.m3u"
 
     try:
-        host_url = str(request_obj.url).split("/playlist")[0] if request_obj else "http://localhost"
+        host_url = request.host_url.rstrip('/')
         response = requests.get(playlist_url, timeout=10)
         response.raise_for_status()
         playlist_content = response.text
@@ -429,35 +429,35 @@ async def playlist_channels(request_obj: Request = None):
                 modified_lines.append(line)
 
         modified_content = '\n'.join(modified_lines)
-        return Response(modified_content, media_type="application/vnd.apple.mpegurl")
+        return Response(modified_content, content_type="application/vnd.apple.mpegurl")
 
     except requests.RequestException as e:
         logger.error(f"Fehler beim Laden der Playlist: {str(e)}")
-        raise HTTPException(status_code=500, detail=f"Fehler beim Laden der Playlist: {str(e)}")
+        return f"Fehler beim Laden der Playlist: {str(e)}", 500
     except Exception as e:
         logger.error(f"Allgemeiner Fehler: {str(e)}")
-        raise HTTPException(status_code=500, detail=f"Allgemeiner Fehler: {str(e)}")
+        return f"Allgemeiner Fehler: {str(e)}", 500
 
 
-@app.get('/playlist/events.m3u8')
-async def playlist_events(request_obj: Request = None):
+@app.route('/playlist/events.m3u8')
+def playlist_events():
     """Generiert die Events-Playlist mit Proxy-Links bei jedem Aufruf"""
     try:
-        host_url = str(request_obj.url).split("/playlist")[0] if request_obj else "http://localhost"
+        host_url = request.host_url.rstrip('/')
 
         schedule_data = fetch_schedule_data()
         if not schedule_data:
-            raise HTTPException(status_code=500, detail="Fehler beim Abrufen der Sendeplandaten")
+            return "Fehler beim Abrufen der Sendeplandaten", 500
 
         m3u_content = json_to_m3u(schedule_data, host_url)
         if not m3u_content:
-            raise HTTPException(status_code=500, detail="Fehler beim Generieren der Playlist")
+            return "Fehler beim Generieren der Playlist", 500
 
-        return Response(m3u_content, media_type="application/vnd.apple.mpegurl")
+        return Response(m3u_content, content_type="application/vnd.apple.mpegurl")
 
     except Exception as e:
         logger.error(f"Fehler in /playlist/events: {str(e)}")
-        raise HTTPException(status_code=500, detail=f"Interner Serverfehler: {str(e)}")
+        return f"Interner Serverfehler: {str(e)}", 500
 
 
 def fetch_schedule_data():
@@ -553,13 +553,12 @@ def json_to_m3u(data, host_url):
     return m3u_content
 
 
-@app.get('/')
-async def index():
+@app.route('/')
+def index():
     """Pagina principale che mostra un messaggio di benvenuto"""
-    return {"message": "FastAPI Proxy with mediaflow_proxy integration started!"}
+    return "Proxy started!"
 
 
 if __name__ == '__main__':
-    import uvicorn
-    logger.info("FastAPI Proxy started with mediaflow_proxy integration!")
-    uvicorn.run(app, host="0.0.0.0", port=7860)
+    logger.info("Proxy started!")
+    app.run(host="0.0.0.0", port=7860, debug=False)
