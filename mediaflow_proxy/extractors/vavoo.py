@@ -4,12 +4,18 @@ import requests
 import os
 from typing import Any, Dict, Optional
 from urllib.parse import urlparse, urljoin, quote, unquote
-from flask import Flask, request, Response
+from fastapi import FastAPI, Request, HTTPException
+from fastapi.responses import Response, StreamingResponse
+from mediaflow_proxy.main import app as mediaflow_app
 from mediaflow_proxy.extractors.base import BaseExtractor, ExtractorError
 
 logger = logging.getLogger(__name__)
 
-app = Flask(__name__)
+# Create main FastAPI app
+app = FastAPI()
+
+# Mount mediaflow_proxy routes
+app.mount("/mediaflow", mediaflow_app)
 
 
 class VavooExtractor(BaseExtractor):
@@ -200,17 +206,16 @@ def resolve_m3u8_link(url, headers=None):
     return extractor.resolve_m3u8_link(url, headers)
 
 
-@app.route('/proxy')
-def proxy():
+@app.get('/proxy')
+async def proxy(url: str = None, request_obj: Request = None):
     """Proxy per liste M3U che aggiunge automaticamente /proxy/m3u?url= con IP prima dei link"""
-    m3u_url = request.args.get('url', '').strip()
-    if not m3u_url:
-        return "Errore: Parametro 'url' mancante", 400
+    if not url or url.strip() == "":
+        raise HTTPException(status_code=400, detail="Errore: Parametro 'url' mancante")
 
     try:
-        server_ip = request.host
+        server_ip = request_obj.client.host if request_obj else "localhost"
 
-        response = requests.get(m3u_url, timeout=(10, 30))
+        response = requests.get(url, timeout=(10, 30))
         response.raise_for_status()
         m3u_content = response.text
 
@@ -225,24 +230,23 @@ def proxy():
 
         modified_content = '\n'.join(modified_lines)
 
-        parsed_m3u_url = urlparse(m3u_url)
+        parsed_m3u_url = urlparse(url)
         original_filename = os.path.basename(parsed_m3u_url.path)
 
-        return Response(modified_content, content_type="application/vnd.apple.mpegurl",
+        return Response(modified_content, media_type="application/vnd.apple.mpegurl",
                        headers={'Content-Disposition': f'attachment; filename="{original_filename}"'})
 
     except requests.RequestException as e:
-        return f"Errore durante il download della lista M3U: {str(e)}", 500
+        raise HTTPException(status_code=500, detail=f"Errore durante il download della lista M3U: {str(e)}")
     except Exception as e:
-        return f"Errore generico: {str(e)}", 500
+        raise HTTPException(status_code=500, detail=f"Errore generico: {str(e)}")
 
 
-@app.route('/proxy/m3u')
-def proxy_m3u():
+@app.get('/proxy/m3u')
+async def proxy_m3u(url: str = None, request_obj: Request = None):
     """Proxy per file M3U e M3U8 con supporto per redirezioni e header personalizzati"""
-    m3u_url = request.args.get('url', '').strip()
-    if not m3u_url:
-        return "Errore: Parametro 'url' mancante", 400
+    if not url or url.strip() == "":
+        raise HTTPException(status_code=400, detail="Errore: Parametro 'url' mancante")
 
     default_headers = {
         "User-Agent": "Mozilla/5.0 (iPhone; CPU iPhone OS 14_5 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) FxiOS/33.0 Mobile/15E148 Safari/605.1.15",
@@ -252,22 +256,22 @@ def proxy_m3u():
 
     request_headers = {
         unquote(key[2:]).replace("_", "-"): unquote(value).strip()
-        for key, value in request.args.items()
+        for key, value in request_obj.query_params.items()
         if key.lower().startswith("h_")
     }
     headers = {**default_headers, **request_headers}
 
-    processed_url = m3u_url
+    processed_url = url
 
-    if '/stream/stream-' in m3u_url and 'daddylive.dad' in m3u_url:
-        processed_url = m3u_url.replace('/stream/stream-', '/embed/stream-')
-        logger.info(f"URL {m3u_url} trasformato da /stream/ a /embed/: {processed_url}")
+    if '/stream/stream-' in url and 'inattv1308.xyz' in url:
+        processed_url = url.replace('/stream/stream-', '/embed/stream-')
+        logger.info(f"URL {url} trasformato da /stream/ a /embed/: {processed_url}")
 
-    match_premium_m3u8 = re.search(r'/zirve/mono\.m3u8$', m3u_url)
+    match_premium_m3u8 = re.search(r'/zirve/mono\.m3u8$', url)
 
     if match_premium_m3u8:
         transformed_url = "https://2i4.d72577a9dd0ec71.cfd/zirve/mono.m3u8"
-        logger.info(f"URL {m3u_url} trasformato in: {transformed_url}")
+        logger.info(f"URL {url} trasformato in: {transformed_url}")
         processed_url = transformed_url
     else:
         logger.info(f"URL {processed_url} processato per la risoluzione.")
@@ -277,7 +281,7 @@ def proxy_m3u():
         result = resolve_m3u8_link(processed_url, headers)
 
         if not result["resolved_url"]:
-            return "Errore: Impossibile risolvere l'URL in un M3U8 valido.", 500
+            raise HTTPException(status_code=500, detail="Errore: Impossibile risolvere l'URL in un M3U8 valido.")
 
         resolved_url = result["resolved_url"]
         current_headers_for_proxy = result["headers"]
@@ -293,7 +297,7 @@ def proxy_m3u():
         file_type = detect_m3u_type(m3u_content)
 
         if file_type == "m3u":
-            return Response(m3u_content, content_type="application/vnd.apple.mpegurl")
+            return Response(m3u_content, media_type="application/vnd.apple.mpegurl")
 
         parsed_url = urlparse(final_url)
         base_url = f"{parsed_url.scheme}://{parsed_url.netloc}{parsed_url.path.rsplit('/', 1)[0]}/"
@@ -311,26 +315,25 @@ def proxy_m3u():
             modified_m3u8.append(line)
 
         modified_m3u8_content = "\n".join(modified_m3u8)
-        return Response(modified_m3u8_content, content_type="application/vnd.apple.mpegurl")
+        return Response(modified_m3u8_content, media_type="application/vnd.apple.mpegurl")
 
     except requests.RequestException as e:
         logger.error(f"Errore durante il download o la risoluzione del file: {str(e)}")
-        return f"Errore durante il download o la risoluzione del file M3U/M3U8: {str(e)}", 500
+        raise HTTPException(status_code=500, detail=f"Errore durante il download o la risoluzione del file M3U/M3U8: {str(e)}")
     except Exception as e:
         logger.error(f"Errore generico nella funzione proxy_m3u: {str(e)}")
-        return f"Errore generico durante l'elaborazione: {str(e)}", 500
+        raise HTTPException(status_code=500, detail=f"Errore generico durante l'elaborazione: {str(e)}")
 
 
-@app.route('/proxy/resolve')
-def proxy_resolve():
+@app.get('/proxy/resolve')
+async def proxy_resolve(url: str = None, request_obj: Request = None):
     """Proxy per risolvere e restituire un URL M3U8"""
-    url = request.args.get('url', '').strip()
-    if not url:
-        return "Errore: Parametro 'url' mancante", 400
+    if not url or url.strip() == "":
+        raise HTTPException(status_code=400, detail="Errore: Parametro 'url' mancante")
 
     headers = {
         unquote(key[2:]).replace("_", "-"): unquote(value).strip()
-        for key, value in request.args.items()
+        for key, value in request_obj.query_params.items()
         if key.lower().startswith("h_")
     }
 
@@ -338,7 +341,7 @@ def proxy_resolve():
         result = resolve_m3u8_link(url, headers)
 
         if not result["resolved_url"]:
-            return "Errore: Impossibile risolvere l'URL", 500
+            raise HTTPException(status_code=500, detail="Errore: Impossibile risolvere l'URL")
 
         headers_query = "&".join([f"h_{quote(k)}={quote(v)}" for k, v in result["headers"].items()])
 
@@ -346,29 +349,28 @@ def proxy_resolve():
             f"#EXTM3U\n"
             f"#EXTINF:-1,Canale Risolto\n"
             f"/proxy/m3u?url={quote(result['resolved_url'])}&{headers_query}",
-            content_type="application/vnd.apple.mpegurl"
+            media_type="application/vnd.apple.mpegurl"
         )
 
     except Exception as e:
         logger.error(f"Errore durante la risoluzione dell'URL: {str(e)}")
-        return f"Errore durante la risoluzione dell'URL: {str(e)}", 500
+        raise HTTPException(status_code=500, detail=f"Errore durante la risoluzione dell'URL: {str(e)}")
 
 
-@app.route('/proxy/ts')
-def proxy_ts():
+@app.get('/proxy/ts')
+async def proxy_ts(url: str = None, request_obj: Request = None):
     """Proxy per segmenti .TS con headers personalizzati - SENZA CACHE"""
-    ts_url = request.args.get('url', '').strip()
-    if not ts_url:
-        return "Errore: Parametro 'url' mancante", 400
+    if not url or url.strip() == "":
+        raise HTTPException(status_code=400, detail="Errore: Parametro 'url' mancante")
 
     headers = {
         unquote(key[2:]).replace("_", "-"): unquote(value).strip()
-        for key, value in request.args.items()
+        for key, value in request_obj.query_params.items()
         if key.lower().startswith("h_")
     }
 
     try:
-        response = requests.get(ts_url, headers=headers, stream=True, allow_redirects=True, timeout=(10, 30))
+        response = requests.get(url, headers=headers, stream=True, allow_redirects=True, timeout=(10, 30))
         response.raise_for_status()
 
         def generate():
@@ -376,44 +378,43 @@ def proxy_ts():
                 if chunk:
                     yield chunk
 
-        return Response(generate(), content_type="video/mp2t")
+        return StreamingResponse(generate(), media_type="video/mp2t")
 
     except requests.RequestException as e:
         logger.error(f"Errore durante il download del segmento TS: {str(e)}")
-        return f"Errore durante il download del segmento TS: {str(e)}", 500
+        raise HTTPException(status_code=500, detail=f"Errore durante il download del segmento TS: {str(e)}")
 
 
-@app.route('/proxy/key')
-def proxy_key():
+@app.get('/proxy/key')
+async def proxy_key(url: str = None, request_obj: Request = None):
     """Proxy per la chiave AES-128 con header personalizzati"""
-    key_url = request.args.get('url', '').strip()
-    if not key_url:
-        return "Errore: Parametro 'url' mancante per la chiave", 400
+    if not url or url.strip() == "":
+        raise HTTPException(status_code=400, detail="Errore: Parametro 'url' mancante per la chiave")
 
     headers = {
         unquote(key[2:]).replace("_", "-"): unquote(value).strip()
-        for key, value in request.args.items()
+        for key, value in request_obj.query_params.items()
         if key.lower().startswith("h_")
     }
 
     try:
-        response = requests.get(key_url, headers=headers, allow_redirects=True, timeout=(5, 15))
+        response = requests.get(url, headers=headers, allow_redirects=True, timeout=(5, 15))
         response.raise_for_status()
 
-        return Response(response.content, content_type="application/octet-stream")
+        return Response(response.content, media_type="application/octet-stream")
 
     except requests.RequestException as e:
         logger.error(f"Errore durante il download della chiave AES-128: {str(e)}")
-        return f"Errore durante il download della chiave AES-128: {str(e)}", 500
+        raise HTTPException(status_code=500, detail=f"Errore durante il download della chiave AES-128: {str(e)}")
 
 
-@app.route('/playlist/channels.m3u8')
-def playlist_channels():
+@app.get('/playlist/channels.m3u8')
+async def playlist_channels(request_obj: Request = None):
     """Gibt eine modifizierte Playlist mit Proxy-Links zurück"""
     playlist_url = "https://raw.githubusercontent.com/mehmetey03/METV/refs/heads/main/karsilasmalar.m3u"
 
     try:
-        host_url = request.host_url.rstrip('/')
+        host_url = str(request_obj.url).split("/playlist")[0] if request_obj else "http://localhost"
         response = requests.get(playlist_url, timeout=10)
         response.raise_for_status()
         playlist_content = response.text
@@ -428,35 +429,35 @@ def playlist_channels():
                 modified_lines.append(line)
 
         modified_content = '\n'.join(modified_lines)
-        return Response(modified_content, content_type="application/vnd.apple.mpegurl")
+        return Response(modified_content, media_type="application/vnd.apple.mpegurl")
 
     except requests.RequestException as e:
         logger.error(f"Fehler beim Laden der Playlist: {str(e)}")
-        return f"Fehler beim Laden der Playlist: {str(e)}", 500
+        raise HTTPException(status_code=500, detail=f"Fehler beim Laden der Playlist: {str(e)}")
     except Exception as e:
         logger.error(f"Allgemeiner Fehler: {str(e)}")
-        return f"Allgemeiner Fehler: {str(e)}", 500
+        raise HTTPException(status_code=500, detail=f"Allgemeiner Fehler: {str(e)}")
 
 
-@app.route('/playlist/events.m3u8')
-def playlist_events():
+@app.get('/playlist/events.m3u8')
+async def playlist_events(request_obj: Request = None):
     """Generiert die Events-Playlist mit Proxy-Links bei jedem Aufruf"""
     try:
-        host_url = request.host_url.rstrip('/')
+        host_url = str(request_obj.url).split("/playlist")[0] if request_obj else "http://localhost"
 
         schedule_data = fetch_schedule_data()
         if not schedule_data:
-            return "Fehler beim Abrufen der Sendeplandaten", 500
+            raise HTTPException(status_code=500, detail="Fehler beim Abrufen der Sendeplandaten")
 
         m3u_content = json_to_m3u(schedule_data, host_url)
         if not m3u_content:
-            return "Fehler beim Generieren der Playlist", 500
+            raise HTTPException(status_code=500, detail="Fehler beim Generieren der Playlist")
 
-        return Response(m3u_content, content_type="application/vnd.apple.mpegurl")
+        return Response(m3u_content, media_type="application/vnd.apple.mpegurl")
 
     except Exception as e:
         logger.error(f"Fehler in /playlist/events: {str(e)}")
-        return f"Interner Serverfehler: {str(e)}", 500
+        raise HTTPException(status_code=500, detail=f"Interner Serverfehler: {str(e)}")
 
 
 def fetch_schedule_data():
@@ -552,12 +553,13 @@ def json_to_m3u(data, host_url):
     return m3u_content
 
 
-@app.route('/')
-def index():
+@app.get('/')
+async def index():
     """Pagina principale che mostra un messaggio di benvenuto"""
-    return "Proxy started!"
+    return {"message": "FastAPI Proxy with mediaflow_proxy integration started!"}
 
 
 if __name__ == '__main__':
-    logger.info("Proxy started!")
-    app.run(host="0.0.0.0", port=7860, debug=False)
+    import uvicorn
+    logger.info("FastAPI Proxy started with mediaflow_proxy integration!")
+    uvicorn.run(app, host="0.0.0.0", port=7860)
