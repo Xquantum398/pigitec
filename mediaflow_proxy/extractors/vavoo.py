@@ -228,8 +228,8 @@ def proxy_m3u():
 
     default_headers = {
         "User-Agent": "Mozilla/5.0 (iPhone; CPU iPhone OS 14_5 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) FxiOS/33.0 Mobile/15E148 Safari/605.1.15",
-        "Referer": "https://vavoo.to/",
-        "Origin": "https://vavoo.to"
+        "Referer": "https://inattv1308.xyz/",
+        "Origin": "https://inattv1308.xyz"
     }
 
     # Estrai gli header dalla richiesta, sovrascrivendo i default
@@ -526,8 +526,8 @@ def json_to_m3u(data, host_url):
                 
                 m3u_content += (
                     f'#EXTINF:-1 tvg-id="{channel_name}" group-title="{group_title}",{channel_name}\n'
-                    '#EXTVLCOPT:http-referrer=https://lefttoplay.xyz/\n'
-                    '#EXTVLCOPT:http-origin=https://lefttoplay.xyz\n'
+                    '#EXTVLCOPT:http-referrer=https://inattv1308.xyz/\n'
+                    '#EXTVLCOPT:http-origin=https://inattv1308.xyz\n'
                     '#EXTVLCOPT:http-user-agent=Mozilla/5.0 (iPhone; CPU iPhone OS 17_7 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/18.0 Mobile/15E148 Safari/604.1\n'
                     f'{proxy_url}\n\n'
                 )
